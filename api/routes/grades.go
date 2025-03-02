@@ -27,36 +27,23 @@ func RegisterGradesRoutes(router *gin.Engine) (gradesProtos.GradesServiceClient,
 	}
 
 	// Rest endpoints.
-	router.GET("/api/grades/:student_id/:courseId", func(c *gin.Context) {
-		controllers.GetStudentCourseGradesHandler(c, grpcClient)
+	router.GET("/grades/course/:courseId/semester/:semesterId", func(c *gin.Context) {
+		controllers.GetCourseGrades(c, grpcClient)
 	})
-
-	router.GET("/api/grades/:student_id", func(c *gin.Context) {
-		controllers.GetStudentGradesHandler(c, grpcClient)
+	router.GET("/grades/student/:studentId/course/:courseId/semester/:semester", func(c *gin.Context) {
+		controllers.GetStudentCourseGrades(c, grpcClient)
 	})
-
-	router.POST("/api/grades/homework", func(c *gin.Context) {
-		controllers.AddHomeworkGradeHandler(c, grpcClient)
+	router.POST("/grades/create", func(c *gin.Context) {
+		controllers.AddSingleGrade(c, grpcClient)
 	})
-
-	router.POST("/api/grades/exam", func(c *gin.Context) {
-		controllers.AddExamGradeHandler(c, grpcClient)
+	router.PUT("/grades/update/", func(c *gin.Context) {
+		controllers.UpdateSingleGrade(c, grpcClient)
 	})
-
-	router.PUT("/api/grades/homework", func(c *gin.Context) {
-		controllers.UpdateHomeworkGradeHandler(c, grpcClient)
+	router.DELETE("/grades/delete", func(c *gin.Context) {
+		controllers.DeleteSingleGrade(c, grpcClient)
 	})
-
-	router.PUT("/api/grades/exam", func(c *gin.Context) {
-		controllers.UpdateExamGradeHandler(c, grpcClient)
-	})
-
-	router.DELETE("/api/grades/homework", func(c *gin.Context) {
-		controllers.DeleteHomeworkGradeHandler(c, grpcClient)
-	})
-
-	router.DELETE("/api/grades/exam", func(c *gin.Context) {
-		controllers.DeleteExamGradeHandler(c, grpcClient)
+	router.GET("/grades/student/:studentId/semester/:semester", func(c *gin.Context) {
+		controllers.GetStudentSemesterGrades(c, grpcClient)
 	})
 
 	return grpcClient, nil

@@ -3,15 +3,11 @@ package controllers
 import (
 	"context"
 	"net/http"
-	"strings"
-	"time"
 
 	gradesProtos "github.com/BetterGR/grades-microservice/protos"
-	"google.golang.org/grpc/credentials/insecure"
-	"k8s.io/klog/v2"
-
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // InitGradesGRPCClient initializes the grades-microservice gRPC client connection.
@@ -24,93 +20,119 @@ func InitGradesGRPCClient(address string) (gradesProtos.GradesServiceClient, err
 	return gradesProtos.NewGradesServiceClient(conn), nil
 }
 
-// GetStudentCourseGradesHandler handles REST requests and calls the gRPC Grades Microservice.
-func GetStudentCourseGradesHandler(c *gin.Context, grpcClient gradesProtos.GradesServiceClient) {
-	authHeader := c.GetHeader("Authorization")
-	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "No authorization token provided"})
+// GetCourseGrades handles the request to get grades for a specific course in a specific semester.
+func GetCourseGrades(c *gin.Context, client gradesProtos.GradesServiceClient) {
+	courseID := c.Param("courseID")
+	semester := c.Param("semester")
+
+	// Call the gRPC method
+	resp, err := client.GetCourseGrades(context.Background(), &gradesProtos.GetCourseGradesRequest{
+		CourseID:   courseID,
+		Semester: semester,
+
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	token := strings.TrimPrefix(authHeader, "Bearer ")
+	c.JSON(http.StatusOK, resp)
+}
+
+// GetStudentCourseGrades handles the request to get grades for a specific student in a specific course and semester.
+func GetStudentCourseGrades(c *gin.Context, client gradesProtos.GradesServiceClient) {
+	studentID := c.Param("studentID")
+	courseID := c.Param("courseID")
+	semester := c.Param("semester")
+
+	// Call the gRPC method
+	resp, err := client.GetStudentCourseGrades(context.Background(), &gradesProtos.GetStudentCourseGradesRequest{
+		StudentID:  studentID,
+		CourseID:   courseID,
+		Semester: semester,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
+// AddSingleGrade handles the request to add a single grade.
+func AddSingleGrade(c *gin.Context, client gradesProtos.GradesServiceClient) {
+	var grade gradesProtos.SingleGrade
+	if err := c.ShouldBindJSON(&grade); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Call the gRPC method
+	resp, err := client.AddSingleGrade(context.Background(), &gradesProtos.AddSingleGradeRequest{
+		Grade: &grade,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
+// UpdateSingleGrade handles the request to update a single grade.
+func UpdateSingleGrade(c *gin.Context, client gradesProtos.GradesServiceClient) {
+	var grade gradesProtos.SingleGrade
+	if err := c.ShouldBindJSON(&grade); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Call the gRPC method
+	resp, err := client.UpdateSingleGrade(context.Background(), &gradesProtos.UpdateSingleGradeRequest{
+		Grade: &grade,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
+// DeleteSingleGrade handles the request to delete a single grade.
+func DeleteSingleGrade(c *gin.Context, client gradesProtos.GradesServiceClient) {
+	var grade gradesProtos.SingleGrade
+	if err := c.ShouldBindJSON(&grade); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Call the gRPC method
+	resp, err := client.RemoveSingleGrade(context.Background(), &gradesProtos.RemoveSingleGradeRequest{
+		GradeID: grade.GetGradeID(),
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
+// GetStudentSemesterGrades handles the request to get grades for a specific student in a specific semester.
+func GetStudentSemesterGrades(c *gin.Context, client gradesProtos.GradesServiceClient) {
 	studentId := c.Param("studentId")
-	courseId := c.Param("courseId")
-	// Build gRPC request.
-	request := &gradesProtos.GetStudentCourseGradesRequest{
-		Token:     token,
-		StudentId: studentId,
-		CourseId:  courseId,
-	}
-	// Call the gRPC server.
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
+	semester := c.Param("semester")
 
-	response, err := grpcClient.GetStudentCourseGrades(ctx, request)
-
+	// Call the gRPC method
+	resp, err := client.GetStudentSemesterGrades(context.Background(), &gradesProtos.GetStudentSemesterGradesRequest{
+		StudentID:  studentId,
+		Semester: semester,
+	})
 	if err != nil {
-		klog.Errorf("Error calling gRPC Grades Microservice: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch grades"})
-
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Send response to the client.
-	c.JSON(http.StatusOK, response.CourseGrades)
-}
-
-// GetStudentGradesHandler handles REST requests and calls the gRPC Grades Microservice to return
-// all the student grades
-func GetStudentGradesHandler(c *gin.Context, grpcClient gradesProtos.GradesServiceClient) {
-	authHeader := c.GetHeader("Authorization")
-	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "No authorization token provided"})
-		return
-	}
-
-	token := strings.TrimPrefix(authHeader, "Bearer ")
-	// Log all parameters for debugging
-	klog.Infof("All params: %v", c.Params)
-
-	studentId := c.Param("student_id")
-	klog.Infof("Student ID from param: '%s'", studentId)
-
-	// Build gRPC request.
-	request := &gradesProtos.StudentId{Token: token, StudentId: studentId}
-	klog.Infof("Request built with student ID: '%s'", request.StudentId)
-
-	// Call the gRPC server.
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	response, err := grpcClient.GetStudentGrades(ctx, request)
-	if err != nil {
-		klog.Errorf("Error calling gRPC Grades Microservice: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch grades"})
-		return
-	}
-	c.JSON(http.StatusOK, response)
-}
-
-func AddHomeworkGradeHandler(c *gin.Context, grpcClient gradesProtos.GradesServiceClient) {
-	c.JSON(http.StatusInternalServerError, gin.H{"error": "Not Implemented"})
-}
-
-func AddExamGradeHandler(c *gin.Context, grpcClient gradesProtos.GradesServiceClient) {
-	c.JSON(http.StatusInternalServerError, gin.H{"error": "Not Implemented"})
-}
-
-func UpdateHomeworkGradeHandler(c *gin.Context, grpcClient gradesProtos.GradesServiceClient) {
-	c.JSON(http.StatusInternalServerError, gin.H{"error": "Not Implemented"})
-}
-
-func UpdateExamGradeHandler(c *gin.Context, grpcClient gradesProtos.GradesServiceClient) {
-	c.JSON(http.StatusInternalServerError, gin.H{"error": "Not Implemented"})
-}
-
-func DeleteHomeworkGradeHandler(c *gin.Context, grpcClient gradesProtos.GradesServiceClient) {
-	c.JSON(http.StatusInternalServerError, gin.H{"error": "Not Implemented"})
-}
-
-func DeleteExamGradeHandler(c *gin.Context, grpcClient gradesProtos.GradesServiceClient) {
-	c.JSON(http.StatusInternalServerError, gin.H{"error": "Not Implemented"})
+	c.JSON(http.StatusOK, resp)
 }
